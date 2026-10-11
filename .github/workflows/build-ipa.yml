@@ -1,0 +1,57 @@
+name: Build ESP32Moto IPA (Sideloading)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ESP32Moto.ipa
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode Version
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.2.app || sudo xcode-select -s /Applications/Xcode_16.0.app || sudo xcode-select -s /Applications/Xcode.app
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: |
+          brew install xcodegen
+
+      - name: Generate Xcode Project
+        run: |
+          xcodegen generate
+          sed -i '' -E 's/objectVersion = [0-9]+/objectVersion = 56/g' ESP32Moto.xcodeproj/project.pbxproj || true
+
+      - name: Build and Archive
+        run: |
+          xcodebuild archive \
+            -project ESP32Moto.xcodeproj \
+            -scheme ESP32Moto \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/ESP32Moto.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+      - name: Package Payload into IPA
+        run: |
+          mkdir -p build/Payload
+          cp -R "build/ESP32Moto.xcarchive/Products/Applications/ESP32Moto.app" build/Payload/
+          cd build
+          zip -qr ESP32Moto.ipa Payload
+          ls -lh ESP32Moto.ipa
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ESP32Moto-ipa
+          path: build/ESP32Moto.ipa
+          retention-days: 14

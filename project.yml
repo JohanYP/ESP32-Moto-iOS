@@ -1,0 +1,28 @@
+name: ESP32Moto
+options:
+  bundleIdPrefix: com.johan
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    TARGETED_DEVICE_FAMILY: "1"
+
+targets:
+  ESP32Moto:
+    type: application
+    platform: iOS
+    sources:
+      - path: ESP32Moto
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.johan.ESP32Moto
+        INFOPLIST_FILE: ESP32Moto/Info.plist
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
