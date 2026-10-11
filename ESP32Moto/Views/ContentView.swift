@@ -1,14 +1,17 @@
 import SwiftUI
+import LocalAuthentication
 
 public struct ContentView: View {
     @StateObject private var ble = BLEManager.shared
     @State private var showingLogs = false
+    @State private var biometricAlertMessage = ""
+    @State private var showingBiometricAlert = false
 
     public var body: some View {
         ZStack {
             Color(red: 0.08, green: 0.09, blue: 0.12).ignoresSafeArea()
 
-            VStack(spacing: 20) {
+            VStack(spacing: 16) {
                 // Header
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
@@ -32,13 +35,13 @@ public struct ContentView: View {
                 .padding(.top, 10)
 
                 // Card de Estado Principal
-                VStack(spacing: 16) {
+                VStack(spacing: 12) {
                     HStack {
                         Image(systemName: ble.isOwnerAuthenticated ? "person.badge.shield.checkmark.fill" : "person.badge.shield.exclamationmark.fill")
-                            .font(.system(size: 38))
+                            .font(.system(size: 36))
                             .foregroundColor(ble.isOwnerAuthenticated ? .green : (ble.isConnected ? .orange : .red))
 
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: 3) {
                             Text(ble.isOwnerAuthenticated ? "PROPIETARIO CONFIRMADO" : (ble.isConnected ? "VERIFICANDO DUEÑO..." : "DESCONECTADO"))
                                 .font(.system(size: 15, weight: .bold, design: .rounded))
                                 .foregroundColor(ble.isOwnerAuthenticated ? .green : (ble.isConnected ? .orange : .red))
@@ -48,14 +51,61 @@ public struct ContentView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
+                    .padding(14)
                     .background(Color.white.opacity(0.05))
                     .cornerRadius(16)
                 }
                 .padding(.horizontal)
 
+                // Controles Biométricos Face ID (Encendido / Apagado Manual)
+                VStack(spacing: 10) {
+                    HStack {
+                        Image(systemName: "faceid")
+                            .foregroundColor(.cyan)
+                        Text("CONTROL DE IGNICIÓN (FACE ID)")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.gray)
+                        Spacer()
+                    }
+
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            solicitarBiometriaParaAccion(encender: true)
+                        }) {
+                            HStack {
+                                Image(systemName: "power")
+                                Text("Encender Moto")
+                            }
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(ble.isOwnerAuthenticated ? Color.green.opacity(0.85) : Color.gray.opacity(0.3))
+                            .cornerRadius(14)
+                        }
+                        .disabled(!ble.isOwnerAuthenticated)
+
+                        Button(action: {
+                            solicitarBiometriaParaAccion(encender: false)
+                        }) {
+                            HStack {
+                                Image(systemName: "poweroff")
+                                Text("Apagar Moto")
+                            }
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(ble.isOwnerAuthenticated ? Color.red.opacity(0.85) : Color.gray.opacity(0.3))
+                            .cornerRadius(14)
+                        }
+                        .disabled(!ble.isOwnerAuthenticated)
+                    }
+                }
+                .padding(.horizontal)
+
                 // Métricas del Receptor
-                VStack(spacing: 12) {
+                VStack(spacing: 10) {
                     HStack(spacing: 12) {
                         MetricBox(
                             title: "MÓDULO BLE",
@@ -92,7 +142,7 @@ public struct ContentView: View {
                 }
                 .padding(.horizontal)
 
-                // Acciones
+                // Botones Auxiliares
                 HStack(spacing: 14) {
                     Button(action: {
                         if ble.isConnected {
@@ -103,14 +153,14 @@ public struct ContentView: View {
                     }) {
                         HStack {
                             Image(systemName: ble.isConnected ? "bolt.slash.fill" : "arrow.clockwise")
-                            Text(ble.isConnected ? "Desconectar" : (ble.isScanning ? "Escaneando..." : "Reconectar"))
+                            Text(ble.isConnected ? "Desconectar" : (ble.isScanning ? "Buscando..." : "Reconectar"))
                         }
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(ble.isConnected ? Color.red.opacity(0.8) : Color.blue)
-                        .cornerRadius(14)
+                        .padding(.vertical, 12)
+                        .background(ble.isConnected ? Color.red.opacity(0.6) : Color.blue)
+                        .cornerRadius(12)
                     }
 
                     Button(action: {
@@ -120,18 +170,18 @@ public struct ContentView: View {
                             Image(systemName: "terminal.fill")
                             Text("Ver Logs")
                         }
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 14)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 12)
                         .background(Color.white.opacity(0.12))
-                        .cornerRadius(14)
+                        .cornerRadius(12)
                     }
                 }
                 .padding(.horizontal)
 
                 // Terminal de Logs en Vivo
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Image(systemName: "waveform.path.ecg")
                             .foregroundColor(.cyan)
@@ -144,7 +194,7 @@ public struct ContentView: View {
 
                     ScrollViewReader { proxy in
                         ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 6) {
+                            LazyVStack(alignment: .leading, spacing: 5) {
                                 ForEach(Array(ble.logs.enumerated()), id: \.offset) { index, log in
                                     Text(log)
                                         .font(.system(size: 11, design: .monospaced))
@@ -152,7 +202,7 @@ public struct ContentView: View {
                                         .id(index)
                                 }
                             }
-                            .padding(12)
+                            .padding(10)
                         }
                         .background(Color.black.opacity(0.4))
                         .cornerRadius(12)
@@ -168,11 +218,57 @@ public struct ContentView: View {
                     }
                 }
                 .padding(.horizontal)
-                .padding(.bottom, 10)
+                .padding(.bottom, 6)
             }
+        }
+        .alert("Seguridad Biométrica", isPresented: $showingBiometricAlert) {
+            Button("Aceptar", role: .cancel) { }
+        } message: {
+            Text(biometricAlertMessage)
         }
         .sheet(isPresented: $showingLogs) {
             FullLogsView(logs: ble.logs)
+        }
+    }
+
+    private func solicitarBiometriaParaAccion(encender: Bool) {
+        let context = LAContext()
+        var error: NSError?
+
+        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+            let razon = encender ? "Autentique con Face ID para autorizar el encendido de la motocicleta." : "Autentique con Face ID para apagar el motor de la motocicleta."
+            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: razon) { exito, evalError in
+                DispatchQueue.main.async {
+                    if exito {
+                        if encender {
+                            ble.addLog("Face ID verificado exitosamente. Solicitando encendido...")
+                            ble.sendCommand("IGNITION_ON")
+                        } else {
+                            ble.addLog("Face ID verificado exitosamente. Solicitando apagado...")
+                            ble.sendCommand("IGNITION_OFF")
+                        }
+                    } else {
+                        biometricAlertMessage = "Autenticación biométrica cancelada o fallida."
+                        showingBiometricAlert = true
+                    }
+                }
+            }
+        } else {
+            // Alternativa con código de acceso del dispositivo
+            context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Ingrese su código de seguridad para continuar.") { exito, evalError in
+                DispatchQueue.main.async {
+                    if exito {
+                        if encender {
+                            ble.sendCommand("IGNITION_ON")
+                        } else {
+                            ble.sendCommand("IGNITION_OFF")
+                        }
+                    } else {
+                        biometricAlertMessage = "Acceso denegado: Código incorrecto."
+                        showingBiometricAlert = true
+                    }
+                }
+            }
         }
     }
 }
@@ -185,7 +281,7 @@ public struct MetricBox: View {
     let icon: String
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(title)
                     .font(.system(size: 10, weight: .bold))
@@ -196,7 +292,7 @@ public struct MetricBox: View {
                     .foregroundColor(color)
             }
             Text(value)
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .font(.system(size: 15, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -204,12 +300,12 @@ public struct MetricBox: View {
                 .font(.system(size: 10, weight: .medium))
                 .foregroundColor(color)
         }
-        .padding(14)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.white.opacity(0.05))
-        .cornerRadius(16)
+        .cornerRadius(14)
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 14)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
     }

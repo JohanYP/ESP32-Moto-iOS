@@ -49,6 +49,15 @@ public final class BLEManager: NSObject, ObservableObject, CBCentralManagerDeleg
         centralManager.scanForPeripherals(withServices: [Self.serviceUUID], options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
     }
 
+    public func sendCommand(_ command: String) {
+        guard isConnected, isOwnerAuthenticated, let char = authCharacteristic, let data = "CMD:\(command)".data(using: .utf8) else {
+            addLog("No se pudo enviar comando: No autenticado.")
+            return
+        }
+        addLog("Enviando comando: CMD:\(command)")
+        targetPeripheral?.writeValue(data, for: char, type: .withResponse)
+    }
+
     public func disconnect() {
         if let p = targetPeripheral {
             centralManager.cancelPeripheralConnection(p)

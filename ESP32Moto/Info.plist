@@ -17,15 +17,17 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>1.2.0</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>2</string>
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>NSBluetoothAlwaysUsageDescription</key>
     <string>ESP32 Moto requiere conexión Bluetooth LE para actuar como tercer factor de autenticación (3FA) del inmovilizador vehicular.</string>
     <key>NSBluetoothPeripheralUsageDescription</key>
     <string>ESP32 Moto se comunica con el receptor de la motocicleta para monitorear rango, ignición y telemetría.</string>
+    <key>NSFaceIDUsageDescription</key>
+    <string>ESP32 Moto requiere Face ID para autorizar el encendido o apagado manual del motor de su motocicleta de forma biométrica.</string>
     <key>UIRequiredDeviceCapabilities</key>
     <array>
         <string>armv7</string>
