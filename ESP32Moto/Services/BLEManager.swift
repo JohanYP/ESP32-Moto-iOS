@@ -159,11 +159,24 @@ public final class BLEManager: NSObject, ObservableObject, CBCentralManagerDeleg
             if char.uuid == Self.charAuthUUID {
                 Task { @MainActor in
                     self.authCharacteristic = char
+                    self.addLog("Canal de autenticación detectado. Suscribiendo y solicitando desafío...")
                 }
                 peripheral.setNotifyValue(true, for: char)
+                peripheral.readValue(for: char)
             } else if char.uuid == Self.charStatusUUID || char.uuid == Self.charLogsUUID {
                 peripheral.setNotifyValue(true, for: char)
                 peripheral.readValue(for: char)
+            }
+        }
+    }
+
+    nonisolated public func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+        if characteristic.uuid == Self.charAuthUUID, characteristic.isNotifying {
+            Task { @MainActor in
+                self.addLog("Canal de seguridad suscrito. Solicitando desafío al receptor...")
+                if let reqData = "REQ_CHALLENGE".data(using: .utf8) {
+                    peripheral.writeValue(reqData, for: characteristic, type: .withResponse)
+                }
             }
         }
     }
