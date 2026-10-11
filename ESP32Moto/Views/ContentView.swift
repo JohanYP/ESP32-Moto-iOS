@@ -65,6 +65,17 @@ public struct ContentView: View {
         .sheet(isPresented: $showingLogs) {
             FullLogsView(logs: ble.logs)
         }
+        .sheet(isPresented: $ble.isResetRequested) {
+            HardwareResetConfirmationSheet(
+                onConfirmFaceID: {
+                    solicitarFaceIDParaReset()
+                },
+                onCancel: {
+                    ble.sendCommand("CANCEL_RESET")
+                    ble.isResetRequested = false
+                }
+            )
+        }
     }
 
     // MARK: - Pantalla de Aprovisionamiento con PIN
@@ -520,6 +531,38 @@ public struct ContentView: View {
         }
     }
 
+    private func solicitarFaceIDParaReset() {
+        let context = LAContext()
+        var error: NSError?
+
+        if context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) {
+            context.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, localizedReason: "Confirme con Face ID para autorizar el restablecimiento del PIN maestro de su motocicleta.") { exito, _ in
+                DispatchQueue.main.async {
+                    if exito {
+                        ble.addLog("Face ID verificado exitosamente para restablecimiento de PIN.")
+                        ble.sendCommand("CONFIRM_RESET")
+                        ble.isResetRequested = false
+                    } else {
+                        biometricAlertMessage = "Autenticación Face ID cancelada o fallida. El reinicio de PIN fue bloqueado."
+                        showingBiometricAlert = true
+                    }
+                }
+            }
+        } else {
+            context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Ingrese su código maestro para autorizar el reinicio.") { exito, _ in
+                DispatchQueue.main.async {
+                    if exito {
+                        ble.sendCommand("CONFIRM_RESET")
+                        ble.isResetRequested = false
+                    } else {
+                        biometricAlertMessage = "Código incorrecto. Reinicio bloqueado."
+                        showingBiometricAlert = true
+                    }
+                }
+            }
+        }
+    }
+
     private func colorParaLog(_ log: String) -> Color {
         if log.contains("[ALERTA") || log.contains("FAIL") || log.contains("DENEGADO") {
             return roseRed
@@ -602,6 +645,67 @@ public struct FullLogsView: View {
                     Button("Cerrar") { dismiss() }
                 }
             }
+        }
+    }
+}
+
+public struct HardwareResetConfirmationSheet: View {
+    let onConfirmFaceID: () -> Void
+    let onCancel: () -> Void
+
+    public var body: some View {
+        ZStack {
+            Color(red: 0.07, green: 0.08, blue: 0.11).ignoresSafeArea()
+
+            VStack(spacing: 24) {
+                Spacer()
+
+                VStack(spacing: 14) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(Color(red: 0.98, green: 0.28, blue: 0.42))
+
+                    Text("Solicitud de Reinicio de PIN")
+                        .font(.system(size: 24, weight: .black, design: .rounded))
+                        .foregroundColor(.white)
+
+                    Text("Se ha presionado el botón físico en el llavero o la motocicleta para restablecer el PIN maestro de seguridad a 123456.\n\nPara confirmar que usted es el propietario legítimo y evitar reinicios no autorizados por robo, autentique con Face ID.")
+                        .font(.system(size: 14))
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.white.opacity(0.85))
+                        .padding(.horizontal, 16)
+                }
+
+                VStack(spacing: 12) {
+                    Button(action: onConfirmFaceID) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "faceid")
+                                .font(.system(size: 18, weight: .bold))
+                            Text("Autorizar Reinicio con Face ID")
+                                .font(.system(size: 15, weight: .bold))
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(Color(red: 0.98, green: 0.28, blue: 0.42))
+                        .cornerRadius(16)
+                    }
+
+                    Button(action: onCancel) {
+                        Text("Rechazar / Cancelar Solicitud")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.gray)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.white.opacity(0.08))
+                            .cornerRadius(16)
+                    }
+                }
+                .padding(.horizontal, 20)
+
+                Spacer()
+            }
+            .padding(20)
         }
     }
 }

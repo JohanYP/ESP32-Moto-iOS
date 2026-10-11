@@ -31,6 +31,7 @@ public final class BLEManager: NSObject, ObservableObject, CBCentralManagerDeleg
     @Published public var isProvisioned = false
     @Published public var provisioningError: String? = nil
     @Published public var pinBlockedSeconds: Int = 0
+    @Published public var isResetRequested: Bool = false
 
     @Published public var connectedPeripheralName: String = "ESP32 Moto"
     @Published public var receiverRSSI: Int = 0
@@ -245,6 +246,26 @@ public final class BLEManager: NSObject, ObservableObject, CBCentralManagerDeleg
     }
 
     private func handleAuthMessage(_ payload: String, peripheral: CBPeripheral) {
+        // CASO 0: SOLICITUD DE RESETEO POR BOTÓN FÍSICO (LLAVERO / MOTO)
+        if payload.starts(with: "RESET_PENDING") {
+            self.isResetRequested = true
+            addLog(">>> ALERTA FÍSICA: Se presionó el botón físico para reiniciar el PIN. Esperando confirmación Face ID... <<<")
+            return
+        }
+
+        if payload == "RESET_EXPIRED" || payload.contains("RESET_CANCELADO") {
+            self.isResetRequested = false
+            addLog("Solicitud de reinicio de PIN cancelada o expirada.")
+            return
+        }
+
+        if payload.contains("RESET_CONFIRMADO") {
+            self.isResetRequested = false
+            resetLocalProvisioning()
+            addLog(">>> RESTABLECIMIENTO CONFIRMADO CON FACE ID: PIN maestro restaurado a 123456. <<<")
+            return
+        }
+
         // CASO A: APROVISIONAMIENTO EXITOSO
         if payload.starts(with: "PROV_OK:") {
             let nuevaClave = String(payload.dropFirst(8))
