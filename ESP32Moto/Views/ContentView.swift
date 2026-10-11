@@ -3,12 +3,12 @@ import LocalAuthentication
 
 public struct ContentView: View {
     @StateObject private var ble = BLEManager.shared
+    @State private var inputPin = ""
     @State private var showingLogs = false
     @State private var biometricAlertMessage = ""
     @State private var showingBiometricAlert = false
-    @State private var switchIsProcessing = false
+    @State private var showingResetAlert = false
 
-    // Colores del sistema de diseño (Automotive Dark Glass)
     private let bgCanvas = Color(red: 0.05, green: 0.06, blue: 0.08)
     private let cardSurface = Color(red: 0.09, green: 0.11, blue: 0.15)
     private let borderCard = Color.white.opacity(0.08)
@@ -21,29 +21,31 @@ public struct ContentView: View {
         ZStack {
             bgCanvas.ignoresSafeArea()
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    // Header Bar
-                    headerBar
-                        .padding(.horizontal, 20)
-                        .padding(.top, 12)
+            if !ble.isProvisioned {
+                // Vista de Aprovisionamiento Inicial / PIN
+                provisioningView
+                    .padding(24)
+            } else {
+                // Dashboard Automotriz Principal
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 20) {
+                        headerBar
+                            .padding(.horizontal, 20)
+                            .padding(.top, 12)
 
-                    // Hero Card: Switch Biométrico Face ID & Estado del Relé
-                    biometricSwitchCard
-                        .padding(.horizontal, 20)
+                        biometricSwitchCard
+                            .padding(.horizontal, 20)
 
-                    // Sección: Radar de Distancia en Vivo (Dual Range)
-                    distanceRadarSection
-                        .padding(.horizontal, 20)
+                        distanceRadarSection
+                            .padding(.horizontal, 20)
 
-                    // Métricas de Enlace y Seguridad (Grid 2x2)
-                    telemetryGrid
-                        .padding(.horizontal, 20)
+                        telemetryGrid
+                            .padding(.horizontal, 20)
 
-                    // Consola de Telemetría y Registros Bluetooth
-                    logsConsoleSection
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 24)
+                        logsConsoleSection
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 24)
+                    }
                 }
             }
         }
@@ -52,12 +54,102 @@ public struct ContentView: View {
         } message: {
             Text(biometricAlertMessage)
         }
+        .alert("Restablecer Vinculación Local", isPresented: $showingResetAlert) {
+            Button("Cancelar", role: .cancel) { }
+            Button("Restablecer", role: .destructive) {
+                ble.resetLocalProvisioning()
+            }
+        } message: {
+            Text("Esto eliminará la clave de dueño guardada en este iPhone. Tendrá que volver a ingresar el PIN maestro de 6 dígitos.")
+        }
         .sheet(isPresented: $showingLogs) {
             FullLogsView(logs: ble.logs)
         }
     }
 
-    // MARK: - Componentes de la Interfaz
+    // MARK: - Pantalla de Aprovisionamiento con PIN
+
+    private var provisioningView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            VStack(spacing: 12) {
+                Image(systemName: "lock.shield.fill")
+                    .font(.system(size: 56))
+                    .foregroundColor(electricCyan)
+
+                Text("Vincular Motocicleta")
+                    .font(.system(size: 26, weight: .black, design: .rounded))
+                    .foregroundColor(.white)
+
+                Text("Ingrese el PIN de fábrica para autorizar este iPhone como el único teléfono propietario.")
+                    .font(.system(size: 14))
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.gray)
+                    .padding(.horizontal, 16)
+            }
+
+            VStack(spacing: 16) {
+                // Campo de PIN
+                SecureField("PIN de 6 dígitos (ej. 123456)", text: $inputPin)
+                    .keyboardType(.numberPad)
+                    .multilineTextAlignment(.center)
+                    .font(.system(size: 22, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white)
+                    .padding()
+                    .background(Color.white.opacity(0.06))
+                    .cornerRadius(16)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(borderCard, lineWidth: 1)
+                    )
+
+                if let err = ble.provisioningError {
+                    Text(err)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(roseRed)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
+
+                Button(action: {
+                    ble.provisionWithPin(inputPin.trimmingCharacters(in: .whitespacesAndNewlines))
+                }) {
+                    HStack {
+                        Image(systemName: "key.fill")
+                        Text("Vincular como Propietario")
+                    }
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(inputPin.count >= 4 ? electricCyan : Color.gray.opacity(0.3))
+                    .cornerRadius(16)
+                }
+                .disabled(inputPin.count < 4)
+            }
+            .padding(20)
+            .background(cardSurface)
+            .cornerRadius(24)
+            .overlay(
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(borderCard, lineWidth: 1)
+            )
+
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(ble.isConnected ? emeraldGreen : roseRed)
+                    .frame(width: 8, height: 8)
+                Text(ble.isConnected ? "Conectado por BLE con la moto" : "Buscando módulo ESP32 Moto...")
+                    .font(.system(size: 12))
+                    .foregroundColor(.gray)
+            }
+
+            Spacer()
+        }
+    }
+
+    // MARK: - Componentes del Dashboard
 
     private var headerBar: some View {
         HStack {
@@ -80,7 +172,17 @@ public struct ContentView: View {
             }
             Spacer()
 
-            // Indicador de Conexión BLE
+            Button(action: {
+                showingResetAlert = true
+            }) {
+                Image(systemName: "gearshape.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(.gray)
+                    .padding(8)
+                    .background(Color.white.opacity(0.06))
+                    .clipShape(Circle())
+            }
+
             HStack(spacing: 6) {
                 Circle()
                     .fill(ble.isOwnerAuthenticated ? emeraldGreen : (ble.isConnected ? Color.orange : roseRed))
@@ -123,7 +225,6 @@ public struct ContentView: View {
 
                 Spacer()
 
-                // SWITCH BIOMÉTRICO INTERACTIVO
                 ZStack {
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
                         .fill(isIgnitionOn ? emeraldGreen.opacity(0.25) : Color.white.opacity(0.08))
@@ -150,7 +251,6 @@ public struct ContentView: View {
                 }
             }
 
-            // Footer de la Tarjeta
             HStack {
                 HStack(spacing: 5) {
                     Image(systemName: ble.isOwnerAuthenticated ? "checkmark.shield.fill" : "lock.shield.fill")
@@ -191,7 +291,7 @@ public struct ContentView: View {
             }
 
             HStack(spacing: 12) {
-                // Tarjeta 1: Distancia Celular <-> Moto (BLE)
+                // Tarjeta 1: Celular • Moto (BLE)
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Image(systemName: "iphone.radiowaves.left.and.right")
@@ -211,7 +311,6 @@ public struct ContentView: View {
                             .foregroundColor(.gray)
                     }
 
-                    // Barra visual de distancia
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 3)
@@ -239,7 +338,7 @@ public struct ContentView: View {
                         )
                 )
 
-                // Tarjeta 2: Distancia Llavero <-> Moto (LoRa 915 MHz)
+                // Tarjeta 2: Llavero • Moto (LoRa 915 MHz)
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Image(systemName: "key.horizontal.fill")
@@ -260,7 +359,6 @@ public struct ContentView: View {
                             .foregroundColor(.gray)
                     }
 
-                    // Barra visual de proximidad
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 3)
@@ -380,7 +478,7 @@ public struct ContentView: View {
         }
     }
 
-    // MARK: - Lógica de Face ID
+    // MARK: - Face ID
 
     private func solicitarFaceIDParaConmutar(encender: Bool) {
         let context = LAContext()
@@ -405,7 +503,6 @@ public struct ContentView: View {
                 }
             }
         } else {
-            // Código de acceso como respaldo
             context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Ingrese su código maestro para autorizar.") { exito, evalError in
                 DispatchQueue.main.async {
                     if exito {
