@@ -42,7 +42,7 @@ public struct ContentView: View {
                             .padding(.horizontal, 20)
 
                         // Métricas Esenciales
-                        telemetryCards
+                        telemetryGrid
                             .padding(.horizontal, 20)
 
                         // Terminal de Registros Desplegable
