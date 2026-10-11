@@ -15,17 +15,17 @@ public struct ContentView: View {
                         Text("ESP32 Moto")
                             .font(.system(size: 26, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
-                        Text("Inmovilizador Vehicular IoT • 3FA")
+                        Text("Inmovilizador Vehicular • 3FA Dueño")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.gray)
                     }
                     Spacer()
                     Circle()
-                        .fill(ble.isConnected ? Color.green : (ble.isScanning ? Color.yellow : Color.red))
-                        .frame(width: 12, height: 12)
+                        .fill(ble.isOwnerAuthenticated ? Color.green : (ble.isConnected ? Color.orange : Color.red))
+                        .frame(width: 14, height: 14)
                         .overlay(
                             Circle()
-                                .stroke(ble.isConnected ? Color.green.opacity(0.4) : Color.clear, lineWidth: 6)
+                                .stroke(ble.isOwnerAuthenticated ? Color.green.opacity(0.4) : Color.clear, lineWidth: 6)
                         )
                 }
                 .padding(.horizontal)
@@ -34,15 +34,15 @@ public struct ContentView: View {
                 // Card de Estado Principal
                 VStack(spacing: 16) {
                     HStack {
-                        Image(systemName: ble.isConnected ? "lock.shield.fill" : "exclamationmark.shield.fill")
+                        Image(systemName: ble.isOwnerAuthenticated ? "person.badge.shield.checkmark.fill" : "person.badge.shield.exclamationmark.fill")
                             .font(.system(size: 38))
-                            .foregroundColor(ble.isConnected ? .green : .orange)
-                        
+                            .foregroundColor(ble.isOwnerAuthenticated ? .green : (ble.isConnected ? .orange : .red))
+
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(ble.isConnected ? "TERCER FACTOR ACTIVO" : "3FA INACTIVO")
+                            Text(ble.isOwnerAuthenticated ? "PROPIETARIO CONFIRMADO" : (ble.isConnected ? "VERIFICANDO DUEÑO..." : "DESCONECTADO"))
                                 .font(.system(size: 15, weight: .bold, design: .rounded))
-                                .foregroundColor(ble.isConnected ? .green : .orange)
-                            Text(ble.isConnected ? "Celular conectado por Bluetooth. Señales LoRa autorizadas." : "Conecte el celular para permitir ignición vehicular.")
+                                .foregroundColor(ble.isOwnerAuthenticated ? .green : (ble.isConnected ? .orange : .red))
+                            Text(ble.isOwnerAuthenticated ? "Llave criptográfica de dueño validada por HMAC-SHA256. Ignición permitida." : "Solo el celular del dueño puede habilitar la motocicleta.")
                                 .font(.system(size: 12))
                                 .foregroundColor(.white.opacity(0.8))
                         }
@@ -60,8 +60,8 @@ public struct ContentView: View {
                         MetricBox(
                             title: "MÓDULO BLE",
                             value: ble.connectedPeripheralName,
-                            subtext: ble.isReceptorAvailable ? "DISPONIBLE" : "NO DETECTADO",
-                            color: ble.isReceptorAvailable ? .green : .red,
+                            subtext: ble.isOwnerAuthenticated ? "DUEÑO VINCULADO" : (ble.isReceptorAvailable ? "DETECTADO" : "NO DISPONIBLE"),
+                            color: ble.isOwnerAuthenticated ? .green : .orange,
                             icon: "cpu"
                         )
                         MetricBox(
@@ -135,7 +135,7 @@ public struct ContentView: View {
                     HStack {
                         Image(systemName: "waveform.path.ecg")
                             .foregroundColor(.cyan)
-                        Text("TELEMETRÍA EN VIVO (BLUETOOTH)")
+                        Text("REGISTRO DE SEGURIDAD (BLUETOOTH)")
                             .font(.system(size: 11, weight: .bold))
                             .foregroundColor(.gray)
                         Spacer()
@@ -148,7 +148,7 @@ public struct ContentView: View {
                                 ForEach(Array(ble.logs.enumerated()), id: \.offset) { index, log in
                                     Text(log)
                                         .font(.system(size: 11, design: .monospaced))
-                                        .foregroundColor(log.contains("[ALERTA") ? .red : (log.contains("[3FA AUTORIZADO") ? .green : .cyan.opacity(0.9)))
+                                        .foregroundColor(log.contains("[ALERTA") ? .red : (log.contains("AUTORIZADO") ? .green : .cyan.opacity(0.9)))
                                         .id(index)
                                 }
                             }
